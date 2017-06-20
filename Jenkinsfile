@@ -1,53 +1,79 @@
-#!/usr/bin/env groovy
+pipeline {
 
-stage("build & unit tests") {
-    node("build") {
-        sleep 10
-    }
-}
+    agent none
 
-stage("static-analysis") {
-    node("build") {
-        sleep 10
-    }
-}
+    stages {
 
-stage("acceptance-tests") {
-
-    def tests = [
-            "firefox" : {
-                node("test") {
-                    sleep 10
-                }
-            },
-            "chrome" : {
-                node("test") {
-                    sleep 10
-                }
-            },
-            "edge" : {
-                node("test") {
-                    sleep 10
+        stage("build & unit tests") {
+            agent { label "build "}
+            steps {
+                withMaven(maven: "M3") {
+                    sh "mvn clean install"
                 }
             }
-    ]
+            post {
+                success {
+                    stash includes: 'target/*.jar', name: 'binary'
+                }
+            }
+        }
 
-    parallel tests
+        stage("static-analysis") {
+            agent { label "build "}
+            steps {
+                withMaven(maven: "M3") {
+                    withSonarQubeEnv("sonarqube") {
+                        sh "mvn sonar:sonar"
+                    }
+                }
+            }
+        }
 
-}
+        stage("test") {
+            agent any
+            steps {
+                parallel (
+                    "firefox" : {
+                        node ("test") {
+                            sleep 2
+                        }
+                    },
+                    "chrome" : {
+                        node ("test") {
+                            sleep 2
+                        }
+                    },
+                    "edge" : {
+                        node ("test"){
+                            sleep 2
+                        }
+                    }
+                )
+            }
+        }
 
-stage("staging") {
-    node {
-        sleep 10
-    }
-}
+        stage("manual-approval") {
+            steps {
+                input "Sure?"
+            }
+        }
 
-stage("manual-approval") {
-    input "Deploy to production?"
-}
+        stage("staging") {
+            agent any
+            steps {
+                deleteDir()
+                unstash "binary"
+                sh "ls -l target"
+            }
+        }
 
-stage("deploy") {
-    node {
-        sleep 10
+        stage("prod") {
+            agent any
+            steps {
+                deleteDir()
+                unstash "binary"
+                sh "ls -l target"
+            }
+        }
     }
 }
