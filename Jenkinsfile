@@ -18,7 +18,7 @@ pipeline {
             }
         }
 
-        stage("static-analysis") {
+       /* stage("static-analysis") {
             agent { label "build "}
             steps {
                 withMaven(maven: "M3") {
@@ -27,7 +27,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }*/
 
         stage("test") {
             agent any
